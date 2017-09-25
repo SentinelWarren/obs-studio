@@ -347,16 +347,6 @@ static int send_packet(struct rtmp_stream *stream,
 		}
 	}
 
-	if (packet->type == OBS_ENCODER_VIDEO) {
-		if (!stream->got_first_video) {
-			stream->start_video_dts_offset = packet->dts;
-			stream->got_first_video = true;
-		}
-
-		packet->dts -= stream->start_video_dts_offset;
-		packet->pts -= stream->start_video_dts_offset;
-	}
-
 	flv_packet_mux(packet, &data, &size, is_header);
 
 #ifdef TEST_FRAMEDROPS
@@ -1100,10 +1090,19 @@ static void rtmp_stream_data(void *data, struct encoder_packet *packet)
 	if (disconnected(stream) || !active(stream))
 		return;
 
-	if (packet->type == OBS_ENCODER_VIDEO)
+	if (packet->type == OBS_ENCODER_VIDEO) {
+		if (!stream->got_first_video) {
+			stream->start_video_dts_offset = packet->dts;
+			stream->got_first_video = true;
+		}
+
+		packet->dts -= stream->start_video_dts_offset;
+		packet->pts -= stream->start_video_dts_offset;
+
 		obs_parse_avc_packet(&new_packet, packet);
-	else
+	} else {
 		obs_encoder_packet_ref(&new_packet, packet);
+	}
 
 	pthread_mutex_lock(&stream->packets_mutex);
 
